@@ -19,7 +19,7 @@ var playlist map[string]int
 
 func addNextTrack(
 	client *mpd.Client, picker strpick.Picker,
-	currentSongIndex int, currentSongID int) {
+	currentSongIndex int, currentSongID int) bool {
 	f, err := picker.Next()
 	checkErr(err)
 
@@ -31,7 +31,7 @@ func addNextTrack(
 		checkErr(err)
 		if sz <= 1 {
 			log.Println("No other songs are available to play")
-			return
+			return false
 		}
 
 		f, err = picker.Next()
@@ -48,10 +48,11 @@ func addNextTrack(
 		}
 
 		checkErr(client.MoveID(id, currentSongIndex))
-		return
+		return false
 	}
 
 	checkErr(client.Add(f))
+	return true
 }
 
 func handlePlayerChange(client *mpd.Client, picker strpick.Picker) {
@@ -81,7 +82,10 @@ func handlePlayerChange(client *mpd.Client, picker strpick.Picker) {
 		log.Printf("Song index: %d\n", currentSongIndex)
 	}
 
-	if _, ok := attrs["nextsongid"]; !ok {
+	_, hasNextSong := attrs["nextsongid"]
+	addedNewTrack := false
+
+	if !hasNextSong {
 		if conf.Debug {
 			log.Println("Reached end of playlist")
 		}
@@ -95,10 +99,11 @@ func handlePlayerChange(client *mpd.Client, picker strpick.Picker) {
 
 		currentSongID, err := strconv.Atoi(attrs["songid"])
 		checkErr(err)
-		addNextTrack(client, picker, currentSongIndex, currentSongID)
+		addedNewTrack =
+			addNextTrack(client, picker, currentSongIndex, currentSongID)
 	}
 
-	if conf.KeepLast >= 0 {
+	if conf.KeepLast >= 0 && (hasNextSong || addedNewTrack) {
 		if currentSongIndex > conf.KeepLast {
 			end := currentSongIndex - conf.KeepLast
 			if conf.Debug {
