@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"strconv"
 	"strings"
@@ -9,75 +10,75 @@ import (
 	"github.com/fhs/gompd/mpd"
 )
 
-// Detect and ignore duplicated player events
-var lastStateAttrs map[string]string
-
-var state string
-var lastFiles = make(map[string]bool)
-
-var playlist map[string]int
-
 func addNextTrack(
 	client *mpd.Client, picker strpick.Picker,
-	currentSongIndex int, currentSongID int) bool {
+	currentSongIndex int, currentSongID int) (bool, error) {
 	f, err := picker.Next()
-	checkErr(err)
+	if err != nil {
+		return false, err
+	}
 
-	for currentSongID == playlist[f] {
+	for currentSongID == s.playlist[f] {
 		if conf.Debug {
 			log.Printf("Selected song [%s] but it was already playing\n", f)
 		}
 		sz, err := picker.Size()
-		checkErr(err)
+		if err != nil {
+			return false, err
+		}
 		if sz <= 1 {
 			log.Println("No other songs are available to play")
-			return false
+			return false, nil
 		}
 
 		f, err = picker.Next()
-		checkErr(err)
+		if err != nil {
+			return false, err
+		}
 	}
 
 	if conf.Debug {
 		log.Println("Adding song " + f)
 	}
 
-	if id, ok := playlist[f]; ok {
+	if id, ok := s.playlist[f]; ok {
 		if conf.Debug {
 			log.Println("Song is already on the playlist, moving")
 		}
 
-		checkErr(client.MoveID(id, currentSongIndex))
-		return false
+		return false, client.MoveID(id, currentSongIndex)
 	}
 
-	checkErr(client.Add(f))
-	return true
+	return true, client.Add(f)
 }
 
-func handlePlayerChange(client *mpd.Client, picker strpick.Picker) {
+func handlePlayerChange(client *mpd.Client, picker strpick.Picker) error {
 	attrs, err := client.Status()
-	checkErr(err)
-
-	if lastStateAttrs["state"] == attrs["state"] &&
-		lastStateAttrs["song"] == attrs["song"] &&
-		lastStateAttrs["songid"] == attrs["songid"] &&
-		lastStateAttrs["nextsongid"] == attrs["nextsongid"] {
-		return
+	if err != nil {
+		return err
 	}
-	lastStateAttrs = attrs
 
-	state = attrs["state"]
+	if s.lastStateAttrs["state"] == attrs["state"] &&
+		s.lastStateAttrs["song"] == attrs["song"] &&
+		s.lastStateAttrs["songid"] == attrs["songid"] &&
+		s.lastStateAttrs["nextsongid"] == attrs["nextsongid"] {
+		return nil
+	}
+	s.lastStateAttrs = attrs
+
+	s.state = attrs["state"]
 	if conf.Debug {
-		log.Println("state: " + state)
+		log.Println("state: " + s.state)
 	}
 
-	if state != "play" {
-		return
+	if s.state != "play" {
+		return nil
 	}
 
 	currentSongIndex, err := strconv.Atoi(attrs["song"])
-	checkErr(err)
+	if err != nil {
+		return err
+	}
 	if conf.Debug {
 		log.Printf("Song index: %d\n", currentSongIndex)
 	}
@@ -91,16 +92,23 @@ func handlePlayerChange(client *mpd.Client, picker strpick.Picker) {
 		}
 
 		sz, err := picker.Size()
-		checkErr(err)
+		if err != nil {
+			return err
+		}
 		if sz == 0 {
 			log.Println("No valid files to add to end of playlist")
-			return
+			return nil
 		}
 
 		currentSongID, err := strconv.Atoi(attrs["songid"])
-		checkErr(err)
-		addedNewTrack =
+		if err != nil {
+			return err
+		}
+		addedNewTrack, err =
 			addNextTrack(client, picker, currentSongIndex, currentSongID)
+		if err != nil {
+			return err
+		}
 	}
 
 	if conf.KeepLast >= 0 && (hasNextSong || addedNewTrack) {
@@ -110,28 +118,38 @@ func handlePlayerChange(client *mpd.Client, picker strpick.Picker) {
 				log.Printf("Removing songs [%d, %d)\n", 0, end)
 			}
 			err := client.Delete(0, end)
-			checkErr(err)
+			if err != nil {
+				return err
+			}
 		}
 	}
-
+	return nil
 }
 
-func handlePlaylistChange(client *mpd.Client) {
+func handlePlaylistChange(client *mpd.Client) error {
 	tracks, err := client.PlaylistInfo(-1, -1)
-	checkErr(err)
+	if err != nil {
+		return err
+	}
 
-	playlist = make(map[string]int)
+	s.playlist = make(map[string]int)
 	for _, t := range tracks {
 		songid, err := strconv.Atoi(t["Id"])
-		checkErr(err)
+		if err != nil {
+			return err
+		}
 
-		playlist[t["file"]] = songid
+		s.playlist[t["file"]] = songid
 	}
+
+	return nil
 }
 
-func handleDatabaseChange(client *mpd.Client, picker strpick.Picker) {
+func handleDatabaseChange(client *mpd.Client, picker strpick.Picker) error {
 	files, err := client.GetFiles()
-	checkErr(err)
+	if err != nil {
+		return err
+	}
 	if conf.Debug {
 		log.Printf("Total files: %d\n", len(files))
 	}
@@ -147,30 +165,36 @@ func handleDatabaseChange(client *mpd.Client, picker strpick.Picker) {
 		matchingf++
 		newFiles[f] = true
 
-		if !lastFiles[f] {
+		if !s.lastFiles[f] {
 			newf++
 			err = picker.Add(f)
-			checkErr(err)
+			if err != nil {
+				return err
+			}
 		} else {
-			delete(lastFiles, f)
+			delete(s.lastFiles, f)
 		}
 	}
 	if conf.Debug {
 		log.Printf("New files: %d, Existing files: %d, Removed files: %d\n",
-			newf, matchingf-newf, len(lastFiles))
+			newf, matchingf-newf, len(s.lastFiles))
 	}
 
-	for f := range lastFiles {
+	for f := range s.lastFiles {
 		err = picker.Remove(f)
-		checkErr(err)
+		if err != nil {
+			return err
+		}
 	}
-	lastFiles = newFiles
+	s.lastFiles = newFiles
+	return nil
 }
 
 func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker strpick.Picker) {
 	wg.Add(1)
 
 	go func() {
+		var err error
 		defer wg.Done()
 
 		for true {
@@ -181,13 +205,20 @@ func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker strpick.Picker) 
 				}
 				switch ev {
 				case "player":
-					handlePlayerChange(client, picker)
+					err = handlePlayerChange(client, picker)
 				case "database":
-					handleDatabaseChange(client, picker)
+					err = handleDatabaseChange(client, picker)
 				case "playlist":
-					handlePlaylistChange(client)
+					err = handlePlaylistChange(client)
+				case "":
+					// Closed channel or garbage event
+					err = errors.New("Watcher.Event channel closed unexpectedly")
 				}
 			case <-closeChan:
+				return
+			}
+			if err != nil {
+				sendError(err)
 				return
 			}
 		}

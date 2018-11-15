@@ -24,7 +24,8 @@ type config struct {
 	Debug       bool
 }
 
-var closeChan = make(chan struct{})
+var closeChan chan struct{}
+var errorChan = make(chan error)
 var conf *config
 var wg sync.WaitGroup
 
@@ -34,38 +35,106 @@ func main() {
 		log.Fatal(err)
 	}
 
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	for true {
+		closeChan = make(chan struct{})
+
+		go run()
+		// TODO -- Handle the unlikely race condition where both goroutines spawned
+		// by run() fail before this routine is ready to read from errorChan
+		select {
+		case <-sigs:
+			signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+			log.Println("SIGINT/SIGTERM caught, exiting")
+			close(closeChan)
+			wg.Wait()
+			os.Exit(0)
+		case err = <-errorChan:
+			log.Printf("Error: %s", err)
+			close(closeChan)
+			wg.Wait()
+		}
+
+		log.Println("Reconnecting in one minute")
+
+		// Will have to refactor if there's a reason to allow reloading configs
+		select {
+		case <-sigs:
+			signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+			log.Println("SIGINT/SIGTERM caught, exiting")
+			os.Exit(0)
+		case <-time.After(60 * time.Second):
+		}
+	}
+}
+
+// TODO -- refactor this more
+type shuffler struct {
+	state          string
+	lastStateAttrs map[string]string
+	lastFiles      map[string]bool
+	playlist       map[string]int
+}
+
+var s shuffler
+
+func run() {
+	s = shuffler{}
+
 	watch, err := mpd.NewWatcher(
 		conf.MPDNetwork, conf.MPDAddress, conf.MPDPassword,
 		"database", "player", "playlist")
-	checkErr(err)
+	if err != nil {
+		sendError(err)
+		return
+	}
 	defer watch.Close()
 
 	client, err := mpd.DialAuthenticated(
 		conf.MPDNetwork, conf.MPDAddress, conf.MPDPassword)
-	checkErr(err)
+	if err != nil {
+		sendError(err)
+		return
+	}
 	defer client.Close()
 
 	picker, err := persistent.NewPicker(conf.DatabaseDir)
-	checkErr(err)
+	if err != nil {
+		sendError(err)
+		return
+	}
 	defer picker.Close()
 
+	err = handleDatabaseChange(client, picker)
+	if err != nil {
+		sendError(err)
+		return
+	}
+	err = handlePlaylistChange(client)
+	if err != nil {
+		sendError(err)
+		return
+	}
+	err = handlePlayerChange(client, picker)
+	if err != nil {
+		sendError(err)
+		return
+	}
 	pingLoop(client)
-
-	handleDatabaseChange(client, picker)
-	handlePlaylistChange(client)
-	handlePlayerChange(client, picker)
 	watchLoop(watch, client, picker)
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	<-sigs
-	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
-
-	log.Println("SIGINT/SIGTERM caught, exiting")
-	close(closeChan)
 	wg.Wait()
-	os.Exit(0)
+	return
+}
+
+// Blocks to send the error on errorChan unless this shuffler is closed
+func sendError(err error) {
+	select {
+	case errorChan <- err:
+	case <-closeChan:
+	}
 }
 
 func pingLoop(client *mpd.Client) {
@@ -80,17 +149,13 @@ func pingLoop(client *mpd.Client) {
 					log.Println("ping")
 				}
 				err := client.Ping()
-				checkErr(err)
+				if err != nil {
+					sendError(err)
+					return
+				}
 			case <-closeChan:
 				return
 			}
 		}
 	}()
-}
-
-func checkErr(err error) {
-	if err != nil {
-		log.Println(err)
-		panic(err)
-	}
 }
