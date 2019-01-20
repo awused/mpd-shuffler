@@ -109,6 +109,10 @@ func handlePlayerChange(client *mpd.Client, picker strpick.Picker) error {
 		if err != nil {
 			return err
 		}
+	} else if conf.Debug {
+		log.Printf(
+			"Current song [%s], next song [%s]",
+			attrs["songid"], attrs["nextsongid"])
 	}
 
 	if conf.KeepLast >= 0 && (hasNextSong || addedNewTrack) {
@@ -190,6 +194,23 @@ func handleDatabaseChange(client *mpd.Client, picker strpick.Picker) error {
 	return nil
 }
 
+func handleOptionsChange(client *mpd.Client) error {
+	attrs, err := client.Status()
+	if err != nil {
+		return err
+	}
+
+	if conf.Debug {
+		log.Printf("Status: %s", attrs)
+	}
+
+	if conf.DisableRepeat && attrs["repeat"] == "1" {
+		return client.Repeat(false)
+	}
+
+	return nil
+}
+
 func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker strpick.Picker) {
 	wg.Add(1)
 
@@ -210,6 +231,8 @@ func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker strpick.Picker) 
 					err = handleDatabaseChange(client, picker)
 				case "playlist":
 					err = handlePlaylistChange(client)
+				case "options":
+					err = handleOptionsChange(client)
 				case "":
 					// Closed channel or garbage event
 					err = errors.New("Watcher.Event channel closed unexpectedly")

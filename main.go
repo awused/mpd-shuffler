@@ -14,14 +14,15 @@ import (
 )
 
 type config struct {
-	MPDNetwork  string
-	MPDAddress  string
-	MPDPassword string
-	DatabaseDir string
-	MPDTimeout  int
-	PathPrefix  string
-	KeepLast    int
-	Debug       bool
+	MPDNetwork    string
+	MPDAddress    string
+	MPDPassword   string
+	DatabaseDir   string
+	MPDTimeout    int
+	PathPrefix    string
+	KeepLast      int
+	DisableRepeat bool
+	Debug         bool
 }
 
 var closeChan chan struct{}
@@ -85,7 +86,7 @@ func run() {
 
 	watch, err := mpd.NewWatcher(
 		conf.MPDNetwork, conf.MPDAddress, conf.MPDPassword,
-		"database", "player", "playlist")
+		"database", "player", "playlist", "options")
 	if err != nil {
 		sendError(err)
 		return
@@ -108,6 +109,13 @@ func run() {
 	defer picker.Close()
 
 	err = handleDatabaseChange(client, picker)
+	if err != nil {
+		sendError(err)
+		return
+	}
+	// Correct options before initializing the playlist
+	// Disabling repeat mode will not trigger a playlist event
+	err = handleOptionsChange(client)
 	if err != nil {
 		sendError(err)
 		return
