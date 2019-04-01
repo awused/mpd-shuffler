@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"strconv"
-	"strings"
 
 	strpick "github.com/awused/go-strpick"
 	"github.com/fhs/gompd/mpd"
@@ -162,7 +161,7 @@ func handleDatabaseChange(client *mpd.Client, picker strpick.Picker) error {
 	matchingf := 0
 	newFiles := make(map[string]bool)
 	for _, f := range files {
-		if !strings.HasPrefix(f, conf.PathPrefix) {
+		if !pathRegex.MatchString(f) {
 			continue
 		}
 

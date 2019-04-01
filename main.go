@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
 	"sync"
 	"syscall"
 	"time"
@@ -19,7 +20,7 @@ type config struct {
 	MPDPassword   string
 	DatabaseDir   string
 	MPDTimeout    int
-	PathPrefix    string
+	PathRegex     string
 	KeepLast      int
 	DisableRepeat bool
 	Debug         bool
@@ -28,6 +29,7 @@ type config struct {
 var closeChan chan struct{}
 var errorChan = make(chan error)
 var conf *config
+var pathRegex *regexp.Regexp
 var wg sync.WaitGroup
 
 func main() {
@@ -35,6 +37,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	pathRegex = regexp.MustCompile(conf.PathRegex)
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
