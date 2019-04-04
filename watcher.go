@@ -5,12 +5,12 @@ import (
 	"log"
 	"strconv"
 
-	strpick "github.com/awused/go-strpick"
+	"github.com/awused/go-strpick/persistent"
 	"github.com/fhs/gompd/mpd"
 )
 
 func addNextTrack(
-	client *mpd.Client, picker strpick.Picker,
+	client *mpd.Client, picker persistent.Picker,
 	currentSongIndex int, currentSongID int) (bool, error) {
 	f, err := picker.Next()
 	if err != nil {
@@ -51,7 +51,7 @@ func addNextTrack(
 	return true, client.Add(f)
 }
 
-func handlePlayerChange(client *mpd.Client, picker strpick.Picker) error {
+func handlePlayerChange(client *mpd.Client, picker persistent.Picker) error {
 	attrs, err := client.Status()
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func handlePlayerChange(client *mpd.Client, picker strpick.Picker) error {
 	return nil
 }
 
-func handlePlaylistChange(client *mpd.Client) error {
+func handlePlaylistChange(client *mpd.Client, picker persistent.Picker) error {
 	tracks, err := client.PlaylistInfo(-1, -1)
 	if err != nil {
 		return err
@@ -145,10 +145,22 @@ func handlePlaylistChange(client *mpd.Client) error {
 		s.playlist[t["file"]] = songid
 	}
 
+	if len(tracks) == 0 {
+		if conf.Debug {
+			log.Println("Playlist empty, adding new track")
+		}
+
+		_, err =
+			addNextTrack(client, picker, -1, -1)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func handleDatabaseChange(client *mpd.Client, picker strpick.Picker) error {
+func handleDatabaseChange(client *mpd.Client, picker persistent.Picker) error {
 	files, err := client.GetFiles()
 	if err != nil {
 		return err
@@ -184,7 +196,7 @@ func handleDatabaseChange(client *mpd.Client, picker strpick.Picker) error {
 	}
 
 	for f := range s.lastFiles {
-		err = picker.Remove(f)
+		err = picker.SoftRemove(f)
 		if err != nil {
 			return err
 		}
@@ -210,7 +222,7 @@ func handleOptionsChange(client *mpd.Client) error {
 	return nil
 }
 
-func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker strpick.Picker) {
+func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker persistent.Picker) {
 	wg.Add(1)
 
 	go func() {
@@ -229,7 +241,7 @@ func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker strpick.Picker) 
 				case "database":
 					err = handleDatabaseChange(client, picker)
 				case "playlist":
-					err = handlePlaylistChange(client)
+					err = handlePlaylistChange(client, picker)
 				case "options":
 					err = handleOptionsChange(client)
 				case "":

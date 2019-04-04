@@ -124,7 +124,7 @@ func run() {
 		sendError(err)
 		return
 	}
-	err = handlePlaylistChange(client)
+	err = handlePlaylistChange(client, picker)
 	if err != nil {
 		sendError(err)
 		return
