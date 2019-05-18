@@ -111,7 +111,13 @@ func run() {
 		return
 	}
 	defer picker.Close()
+	err = picker.SetRandomlyDistributeNewStrings(true)
+	if err != nil {
+		sendError(err)
+		return
+	}
 
+	// Fetch the database before anything else, so it's available.
 	err = handleDatabaseChange(client, picker)
 	if err != nil {
 		sendError(err)

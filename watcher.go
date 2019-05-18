@@ -172,6 +172,7 @@ func handleDatabaseChange(client *mpd.Client, picker persistent.Picker) error {
 	newf := 0
 	matchingf := 0
 	newFiles := make(map[string]bool)
+	toAdd := make([]string, 0)
 	for _, f := range files {
 		if !pathRegex.MatchString(f) {
 			continue
@@ -182,14 +183,19 @@ func handleDatabaseChange(client *mpd.Client, picker persistent.Picker) error {
 
 		if !s.lastFiles[f] {
 			newf++
-			err = picker.Add(f)
-			if err != nil {
-				return err
-			}
+			toAdd = append(toAdd, f)
 		} else {
 			delete(s.lastFiles, f)
 		}
 	}
+
+	// AddAll Gives better behaviour when new songs are encountered during
+	// initial load
+	err = picker.AddAll(toAdd)
+	if err != nil {
+		return err
+	}
+
 	if conf.Debug {
 		log.Printf("New files: %d, Existing files: %d, Removed files: %d\n",
 			newf, matchingf-newf, len(s.lastFiles))
