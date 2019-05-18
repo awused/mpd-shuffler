@@ -222,7 +222,17 @@ func handleOptionsChange(client *mpd.Client) error {
 	}
 
 	if conf.DisableRepeat && attrs["repeat"] == "1" {
-		return client.Repeat(false)
+		err = client.Repeat(false)
+		if err != nil {
+			return err
+		}
+	}
+
+	if conf.LockVolume && attrs["volume"] != "100" {
+		err = client.SetVolume(100)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -249,6 +259,8 @@ func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker persistent.Picke
 				case "playlist":
 					err = handlePlaylistChange(client, picker)
 				case "options":
+					err = handleOptionsChange(client)
+				case "mixer":
 					err = handleOptionsChange(client)
 				case "":
 					// Closed channel or garbage event

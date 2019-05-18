@@ -16,7 +16,8 @@ DatabaseDir = '/path/to/db/dir'
 # Default MPD timeout is 60 seconds, and this must be lower
 MPDTimeout = 50
 
-# Regex that songs must match to be included in the rotation
+# Regex that song paths must match to be included in the rotation
+# Paths are relative to the root of the MPD library.
 PathRegex = ''
 
 # How many previously played songs to keep on the playlist.
@@ -27,6 +28,9 @@ KeepLast = 10
 # Automatically disable repeat mode
 # Repeat mode will effectively disable the shuffler
 DisableRepeat = true
+
+# Lock the volume to 100% in case something else is changing it
+# LockVolume = true
 
 # Enable debugging output
 # Debug = true

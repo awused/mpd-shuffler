@@ -23,6 +23,7 @@ type config struct {
 	PathRegex     string
 	KeepLast      int
 	DisableRepeat bool
+	LockVolume    bool
 	Debug         bool
 }
 
@@ -90,7 +91,7 @@ func run() {
 
 	watch, err := mpd.NewWatcher(
 		conf.MPDNetwork, conf.MPDAddress, conf.MPDPassword,
-		"database", "player", "playlist", "options")
+		"database", "player", "playlist", "options", "mixer")
 	if err != nil {
 		sendError(err)
 		return
