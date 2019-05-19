@@ -228,7 +228,8 @@ func handleOptionsChange(client *mpd.Client) error {
 		}
 	}
 
-	if conf.LockVolume && attrs["volume"] != "100" {
+	vol, ok := attrs["volume"]
+	if conf.LockVolume && ok && vol != "100" {
 		err = client.SetVolume(100)
 		if err != nil {
 			return err
