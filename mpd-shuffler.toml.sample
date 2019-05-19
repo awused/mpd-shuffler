@@ -25,6 +25,10 @@ PathRegex = ''
 # Negative values disable this behaviour
 KeepLast = 10
 
+# Whether or not to treat newly added songs as not having been played in a
+# long time. Set to true to make newly added songs very likely to be played.
+# NewSongsTreatedAsOld = true
+
 # Automatically disable repeat mode
 # Repeat mode will effectively disable the shuffler
 DisableRepeat = true

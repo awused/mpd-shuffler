@@ -15,16 +15,17 @@ import (
 )
 
 type config struct {
-	MPDNetwork    string
-	MPDAddress    string
-	MPDPassword   string
-	DatabaseDir   string
-	MPDTimeout    int
-	PathRegex     string
-	KeepLast      int
-	DisableRepeat bool
-	LockVolume    bool
-	Debug         bool
+	MPDNetwork           string
+	MPDAddress           string
+	MPDPassword          string
+	DatabaseDir          string
+	MPDTimeout           int
+	PathRegex            string
+	KeepLast             int
+	NewSongsTreatedAsOld bool
+	DisableRepeat        bool
+	LockVolume           bool
+	Debug                bool
 }
 
 var closeChan chan struct{}
@@ -112,7 +113,7 @@ func run() {
 		return
 	}
 	defer picker.Close()
-	err = picker.SetRandomlyDistributeNewStrings(true)
+	err = picker.SetRandomlyDistributeNewStrings(!conf.NewSongsTreatedAsOld)
 	if err != nil {
 		sendError(err)
 		return
