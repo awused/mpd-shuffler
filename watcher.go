@@ -267,6 +267,11 @@ func watchLoop(watcher *mpd.Watcher, client *mpd.Client, picker persistent.Picke
 					// Closed channel or garbage event
 					err = errors.New("Watcher.Event channel closed unexpectedly")
 				}
+			case <-cleanChan:
+				err = picker.CleanDB()
+				if err == nil {
+					log.Println("DB finished cleaning")
+				}
 			case <-closeChan:
 				return
 			}

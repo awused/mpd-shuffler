@@ -30,6 +30,7 @@ type config struct {
 
 var closeChan chan struct{}
 var errorChan = make(chan error)
+var cleanChan = make(chan struct{}, 1)
 var conf *config
 var pathRegex *regexp.Regexp
 var wg sync.WaitGroup
@@ -43,35 +44,59 @@ func main() {
 	pathRegex = regexp.MustCompile(conf.PathRegex)
 
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
 
 	for true {
 		closeChan = make(chan struct{})
 
 		go run()
-		// TODO -- Handle the unlikely race condition where both goroutines spawned
-		// by run() fail before this routine is ready to read from errorChan
+
+	Watchdog:
+		for true {
+			select {
+			case sig := <-sigs:
+				if sig == syscall.SIGUSR1 {
+					log.Println("SIGUSR1 caught, cleaning DB")
+					select {
+					case cleanChan <- struct{}{}:
+					default:
+					}
+				} else {
+					signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+					log.Println("SIGINT/SIGTERM caught, exiting")
+					close(closeChan)
+					wg.Wait()
+					os.Exit(0)
+				}
+			case err = <-errorChan:
+				log.Printf("Error: %s", err)
+				close(closeChan)
+				wg.Wait()
+				break Watchdog
+			}
+		}
+
 		select {
-		case <-sigs:
-			signal.Reset(syscall.SIGINT, syscall.SIGTERM)
-			log.Println("SIGINT/SIGTERM caught, exiting")
-			close(closeChan)
-			wg.Wait()
-			os.Exit(0)
-		case err = <-errorChan:
-			log.Printf("Error: %s", err)
-			close(closeChan)
-			wg.Wait()
+		case <-errorChan:
+		default:
 		}
 
 		log.Println("Reconnecting in one minute")
 
 		// Will have to refactor if there's a reason to allow reloading configs
 		select {
-		case <-sigs:
-			signal.Reset(syscall.SIGINT, syscall.SIGTERM)
-			log.Println("SIGINT/SIGTERM caught, exiting")
-			os.Exit(0)
+		case sig := <-sigs:
+			if sig == syscall.SIGUSR1 {
+				log.Println("SIGUSR1 caught, cleaning DB after reconnect")
+				select {
+				case cleanChan <- struct{}{}:
+				default:
+				}
+			} else {
+				signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+				log.Println("SIGINT/SIGTERM caught, exiting")
+				os.Exit(0)
+			}
 		case <-time.After(60 * time.Second):
 		}
 	}
