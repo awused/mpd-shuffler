@@ -3,12 +3,15 @@ mpd-shuffler
 
 Randomly shuffles your MPD library in a way that makes less recently played songs more likely to be played.
 
+# About
+
+This uses [aw-shuffle](https://github.com/awused/go-strpick) to randomly shuffle your MPD library, continuously, forever. Compared to ashuffle it does not use a small sliding window of recently played songs, making it more likely that every song will be picked in a reasonable amount of time.
 
 # Usage
 
-`go get -u github.com/awused/mpd-shuffler`
+`cargo install --git http://github.com/awused/mpd-shuffler`
 
-Fill in mpd-shuffler.toml and copy it to your choice of /usr/local/etc/mpd-shuffler.toml, /usr/etc/mpd-shuffler.toml, $GOBIN/mpd-shuffler.toml, or $HOME/.mpd-shuffler.toml.
+Fill in mpd-shuffler.toml and copy it to your choice of $HOME/.config/mpd-shuffler/mpd-shuffler.toml, $HOME/.mpd-shuffler.toml, /usr/local/etc/mpd-shuffler.toml, or /usr/etc/mpd-shuffler.toml.
 
 
 ### Cleaning
