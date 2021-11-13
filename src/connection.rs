@@ -296,7 +296,7 @@ async fn update_files(client: &mut Client, shuffler: &mut Shuffler<String>) -> R
     }
 
     for nf in new_files.into_iter() {
-        shuffler.add(nf).unwrap();
+        shuffler.load(nf).unwrap();
     }
 
     for rf in remove_files.into_iter() {
