@@ -11,7 +11,7 @@ repository = "https://github.com/awused/mpd-shuffler"
 
 [dependencies]
 awconf = { git = "https://github.com/awused/awconf" }
-aw-shuffle = { git = "https://github.com/awused/go-strpick", features = [ "rocks" ] }
+aw-shuffle = { git = "https://github.com/awused/aw-shuffle", features = [ "rocks" ] }
 futures-util = { version = "0.3.17", default-features = false, features = [ "sink" ] }
 mpd_protocol = { version = "=0.12.1", features = [ "async" ] }
 once_cell = "1.8.0"
