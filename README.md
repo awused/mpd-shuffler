@@ -5,7 +5,7 @@ Randomly shuffles your MPD library in a way that makes less recently played song
 
 # About
 
-This uses [aw-shuffle](https://github.com/awused/go-strpick) to randomly shuffle your MPD library, continuously, forever. Compared to ashuffle it does not use a small sliding window of recently played songs, making it more likely that every song will be picked in a reasonable amount of time.
+This uses [aw-shuffle](https://github.com/awused/aw-shuffle) to randomly shuffle your MPD library, continuously, forever. Compared to ashuffle it does not use a small sliding window of recently played songs, making it more likely that every song will be picked in a reasonable amount of time.
 
 # Usage
 
