@@ -4,12 +4,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use clap::StructOpt;
 use futures_util::StreamExt;
 use once_cell::sync::Lazy;
 use signal_hook::consts::{SIGHUP, SIGUSR1, TERM_SIGNALS};
 use signal_hook::flag;
 use signal_hook_tokio::Signals;
-use structopt::StructOpt;
 use tokio::select;
 
 
@@ -27,7 +27,7 @@ pub struct Opt {
     awconf: Option<PathBuf>,
 }
 
-pub static OPTIONS: Lazy<Opt> = Lazy::new(Opt::from_args);
+pub static OPTIONS: Lazy<Opt> = Lazy::new(Opt::parse);
 static CLOSED: Lazy<Arc<AtomicBool>> = Lazy::new(|| Arc::new(AtomicBool::new(false)));
 
 

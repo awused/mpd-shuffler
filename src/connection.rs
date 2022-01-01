@@ -6,15 +6,14 @@ use std::time::Duration;
 use aw_shuffle::persistent::rocksdb::Shuffler;
 use aw_shuffle::persistent::{Options, PersistentShuffler};
 use aw_shuffle::AwShuffler;
-use futures_util::{SinkExt, StreamExt};
-use mpd_protocol::{response, Command, MpdCodec, MpdProtocolError, Response};
+use futures_util::StreamExt;
+use mpd_protocol::{response, AsyncConnection, Command, MpdProtocolError, Response};
 use signal_hook::consts::SIGUSR1;
 use signal_hook_tokio::Signals;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{lookup_host, TcpStream, UnixStream};
 use tokio::select;
 use tokio::time::{interval, MissedTickBehavior};
-use tokio_util::codec::Framed;
 
 use crate::config::CONFIG;
 
@@ -34,7 +33,7 @@ pub(super) enum Error {
 }
 
 type Result<T> = std::result::Result<T, Error>;
-type Client = Framed<Box<dyn MpdIo>, MpdCodec>;
+type Client = AsyncConnection<Box<dyn MpdIo>>;
 
 #[derive(Default, Debug)]
 struct PlayerState {
@@ -62,7 +61,7 @@ pub(super) async fn run(signals: &mut Signals) -> Result<()> {
     } else {
         Box::new(UnixStream::connect(&CONFIG.mpd_address).await?)
     };
-    let mut client = MpdCodec::connect(client).await?;
+    let mut client = AsyncConnection::connect(client).await?;
 
 
     let files = get_files(&mut client).await?.collect();
@@ -78,10 +77,10 @@ pub(super) async fn run(signals: &mut Signals) -> Result<()> {
     client.send(idle_command.clone()).await?;
     loop {
         select! {
-            idle = client.next() => {
-                let resp = idle.ok_or(Error::UnexpectedNone)?;
+            idle = client.receive() => {
+                let resp = idle?.ok_or(Error::UnexpectedNone)?;
 
-                for (_, v) in flatten_response(resp?)? {
+                for (_, v) in flatten_response(resp)? {
                     match &*v {
                         "database" => update_files(&mut client, &mut shuffler).await?,
                         "player" => ps.player_change(&mut client, &mut shuffler).await?,
@@ -128,7 +127,7 @@ impl PlayerState {
         shuffler: &mut Shuffler<String>,
     ) -> Result<()> {
         client.send(Command::new("status")).await?;
-        let resp = client.next().await.ok_or(Error::UnexpectedNone)??;
+        let resp = client.receive().await?.ok_or(Error::UnexpectedNone)?;
         let mut resp: HashMap<_, _> = flatten_response(resp)?.collect();
 
         if self.state == resp.get("state").map_or("", |s| &*s)
@@ -168,7 +167,7 @@ impl PlayerState {
         shuffler: &mut Shuffler<String>,
     ) -> Result<()> {
         client.send(Command::new("playlistinfo")).await?;
-        let resp = client.next().await.ok_or(Error::UnexpectedNone)??;
+        let resp = client.receive().await?.ok_or(Error::UnexpectedNone)?;
         let resp = flatten_response(resp)?;
 
         self.playlist.clear();
@@ -264,9 +263,9 @@ fn flatten_response(resp: Response) -> Result<impl Iterator<Item = (Arc<str>, St
 async fn send_recv_simple(client: &mut Client, cmd: Command) -> Result<()> {
     client.send(cmd).await?;
     client
-        .next()
-        .await
-        .ok_or(Error::UnexpectedNone)??
+        .receive()
+        .await?
+        .ok_or(Error::UnexpectedNone)?
         .single_frame()?;
     Ok(())
 }
@@ -274,7 +273,7 @@ async fn send_recv_simple(client: &mut Client, cmd: Command) -> Result<()> {
 async fn get_files(client: &mut Client) -> Result<impl Iterator<Item = String>> {
     client.send(Command::new("list").argument("file")).await?;
 
-    let resp = client.next().await.ok_or(Error::UnexpectedNone)??;
+    let resp = client.receive().await?.ok_or(Error::UnexpectedNone)?;
     Ok(flatten_response(resp)?
         .filter(|(k, s)| {
             &**k == "file" && CONFIG.song_regex.as_ref().map_or(true, |re| re.is_match(s))
@@ -308,7 +307,7 @@ async fn update_files(client: &mut Client, shuffler: &mut Shuffler<String>) -> R
 
 async fn options_change(client: &mut Client) -> Result<()> {
     client.send(Command::new("status")).await?;
-    let resp = client.next().await.ok_or(Error::UnexpectedNone)??;
+    let resp = client.receive().await?.ok_or(Error::UnexpectedNone)?;
 
     for (k, v) in flatten_response(resp)? {
         if &*k == "repeat" && &v == "1" && CONFIG.disable_repeat {
