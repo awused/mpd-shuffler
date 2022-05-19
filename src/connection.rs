@@ -177,29 +177,25 @@ impl PlayerState {
         let mut id = None;
         for (k, v) in resp {
             if &*k == "file" {
-                if file.is_some() {
-                    panic!("Mismatched playlist, unmatched file:{:?}", file);
-                }
+                assert!(file.is_none(), "Mismatched playlist, unmatched file: {:?}", file);
                 file = Some(v);
             } else if &*k == "Id" {
-                if id.is_some() {
-                    panic!("Mismatched playlist, unmatched id:{:?}", id);
-                }
+                assert!(id.is_none(), "Mismatched playlist, unmatched id:{:?}", id);
                 id = Some(v);
             }
 
             if file.is_some() && id.is_some() {
-                self.playlist
-                    .insert(file.take().unwrap(), id.take().unwrap());
+                self.playlist.insert(file.take().unwrap(), id.take().unwrap());
             }
         }
 
-        if file.is_some() || id.is_some() {
-            panic!(
-                "Mismatched playlist, unmatched file:{:?} or id:{:?}",
-                file, id
-            );
-        }
+        // If either are still set then one was unpaired.
+        assert!(
+            file.is_none() && id.is_none(),
+            "Mismatched playlist, unmatched file: {:?} or id: {:?}",
+            file,
+            id
+        );
 
         if self.playlist.is_empty() {
             self.maybe_add_next(client, shuffler).await?;
@@ -235,9 +231,7 @@ impl PlayerState {
         if let Some(id) = random_id {
             send_recv_simple(
                 client,
-                Command::new("moveid")
-                    .argument(id.clone())
-                    .argument(self.song.clone()),
+                Command::new("moveid").argument(id.clone()).argument(self.song.clone()),
             )
             .await?;
             Ok(false)
@@ -254,19 +248,13 @@ fn flatten_response(resp: Response) -> Result<impl Iterator<Item = (Arc<str>, St
         unreachable!()
     }
 
-    let resp = resp
-        .into_iter()
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    Ok(resp.into_iter().map(IntoIterator::into_iter).flatten())
+    let resp = resp.into_iter().collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(resp.into_iter().flat_map(IntoIterator::into_iter))
 }
 
 async fn send_recv_simple(client: &mut Client, cmd: Command) -> Result<()> {
     client.send(cmd).await?;
-    client
-        .receive()
-        .await?
-        .ok_or(Error::UnexpectedNone)?
-        .single_frame()?;
+    client.receive().await?.ok_or(Error::UnexpectedNone)?.single_frame()?;
     Ok(())
 }
 
@@ -287,18 +275,18 @@ async fn update_files(client: &mut Client, shuffler: &mut Shuffler<String>) -> R
 
     let existing_files = shuffler.values().into_iter().collect::<HashSet<_>>();
 
-    for ef in existing_files.into_iter() {
+    for ef in existing_files {
         if !new_files.remove(ef) {
             // Unless churn is very large this will introduce minimal cloning.
             remove_files.insert(ef.clone());
         }
     }
 
-    for nf in new_files.into_iter() {
+    for nf in new_files {
         shuffler.load(nf).unwrap();
     }
 
-    for rf in remove_files.into_iter() {
+    for rf in remove_files {
         shuffler.soft_remove(&rf).unwrap();
     }
 
