@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::num::ParseIntError;
 use std::sync::Arc;
-use std::time::Duration;
 
 use aw_shuffle::persistent::rocksdb::Shuffler;
 use aw_shuffle::persistent::{Options, PersistentShuffler};
@@ -13,7 +12,6 @@ use signal_hook_tokio::Signals;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{lookup_host, TcpStream, UnixStream};
 use tokio::select;
-use tokio::time::{interval, MissedTickBehavior};
 
 use crate::config::CONFIG;
 
@@ -24,7 +22,7 @@ impl<M: AsyncRead + AsyncWrite + Unpin> MpdIo for M {}
 // We assume anything dealing with MPD is allowed to fail, but anything involving the shuffler must
 // succeed.
 #[derive(Debug)]
-pub(super) enum Error {
+pub enum Error {
     IO(std::io::Error),
     Mpd(MpdProtocolError),
     MpdResponse(response::Error),
@@ -44,10 +42,7 @@ struct PlayerState {
     playlist: HashMap<String, String>,
 }
 
-pub(super) async fn run(signals: &mut Signals) -> Result<()> {
-    let mut ping = interval(Duration::from_secs(CONFIG.mpd_timeout));
-    ping.set_missed_tick_behavior(MissedTickBehavior::Burst);
-
+pub async fn run(signals: &mut Signals) -> Result<()> {
     let idle_command = Command::new("idle")
         .argument("database")
         .argument("player")
@@ -130,10 +125,10 @@ impl PlayerState {
         let resp = client.receive().await?.ok_or(Error::UnexpectedNone)?;
         let mut resp: HashMap<_, _> = flatten_response(resp)?.collect();
 
-        if self.state == resp.get("state").map_or("", |s| &*s)
-            && self.song == resp.get("song").map_or("", |s| &*s)
-            && self.song_id == resp.get("songid").map_or("", |s| &*s)
-            && self.next_song_id == resp.get("nextsongid").map_or("", |s| &*s)
+        if self.state == resp.get("state").map_or("", |s| s)
+            && self.song == resp.get("song").map_or("", |s| s)
+            && self.song_id == resp.get("songid").map_or("", |s| s)
+            && self.next_song_id == resp.get("nextsongid").map_or("", |s| s)
         {
             return Ok(());
         }

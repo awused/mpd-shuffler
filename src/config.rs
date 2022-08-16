@@ -30,13 +30,6 @@ pub struct Config {
 
     #[serde(default)]
     pub disable_crossfade: bool,
-
-    #[serde(default = "fifty")]
-    pub mpd_timeout: u64,
-}
-
-const fn fifty() -> u64 {
-    50
 }
 
 fn negative_is_none<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
