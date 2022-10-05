@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use clap::StructOpt;
+use clap::Parser;
 use futures_util::StreamExt;
 use once_cell::sync::Lazy;
 use signal_hook::consts::{SIGHUP, SIGUSR1, TERM_SIGNALS};
@@ -16,13 +16,13 @@ use tokio::select;
 mod config;
 mod connection;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[command(
     name = "mpd-shuffler",
     about = "Application to continuously shuffle your MPD library."
 )]
 pub struct Opt {
-    #[structopt(short, long, parse(from_os_str))]
+    #[arg(short, long, value_parser)]
     /// Override the selected config.
     awconf: Option<PathBuf>,
 }
