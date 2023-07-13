@@ -47,7 +47,7 @@ async fn main() -> Result<(), Error> {
     'outer: while !CLOSED.load(Ordering::Relaxed) {
         match connection::run(&mut signals).await {
             Ok(_) => (),
-            Err(e) => println!("Encountered error {:?}", e),
+            Err(e) => println!("Encountered error {e:?}"),
         }
 
         if CLOSED.load(Ordering::Relaxed) {

@@ -49,7 +49,7 @@ where
         return Ok(None);
     }
     Regex::new(&re).map_or_else(
-        |e| panic!("Unable to deserialize regular expression [{}] {}", re, e),
+        |e| panic!("Unable to deserialize regular expression [{re}] {e}"),
         |v| Ok(Some(v)),
     )
 }

@@ -6,7 +6,8 @@ use aw_shuffle::persistent::rocksdb::Shuffler;
 use aw_shuffle::persistent::{Options, PersistentShuffler};
 use aw_shuffle::AwShuffler;
 use futures_util::StreamExt;
-use mpd_protocol::{response, AsyncConnection, Command, MpdProtocolError, Response};
+use mpd_protocol::response::Response;
+use mpd_protocol::{response, AsyncConnection, Command, MpdProtocolError};
 use signal_hook::consts::SIGUSR1;
 use signal_hook_tokio::Signals;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -132,10 +133,10 @@ impl PlayerState {
         {
             return Ok(());
         }
-        self.state = resp.remove("state").unwrap_or_else(|| "".to_string());
-        self.song = resp.remove("song").unwrap_or_else(|| "".to_string());
-        self.song_id = resp.remove("songid").unwrap_or_else(|| "".to_string());
-        self.next_song_id = resp.remove("nextsongid").unwrap_or_else(|| "".to_string());
+        self.state = resp.remove("state").unwrap_or_default();
+        self.song = resp.remove("song").unwrap_or_default();
+        self.song_id = resp.remove("songid").unwrap_or_default();
+        self.next_song_id = resp.remove("nextsongid").unwrap_or_default();
 
         if self.state != "play" {
             return Ok(());
@@ -172,10 +173,10 @@ impl PlayerState {
         let mut id = None;
         for (k, v) in resp {
             if &*k == "file" {
-                assert!(file.is_none(), "Mismatched playlist, unmatched file: {:?}", file);
+                assert!(file.is_none(), "Mismatched playlist, unmatched file: {file:?}");
                 file = Some(v);
             } else if &*k == "Id" {
-                assert!(id.is_none(), "Mismatched playlist, unmatched id:{:?}", id);
+                assert!(id.is_none(), "Mismatched playlist, unmatched id:{id:?}");
                 id = Some(v);
             }
 
@@ -187,9 +188,7 @@ impl PlayerState {
         // If either are still set then one was unpaired.
         assert!(
             file.is_none() && id.is_none(),
-            "Mismatched playlist, unmatched file: {:?} or id: {:?}",
-            file,
-            id
+            "Mismatched playlist, unmatched file: {file:?} or id: {id:?}"
         );
 
         if self.playlist.is_empty() {
@@ -239,7 +238,7 @@ impl PlayerState {
 
 fn flatten_response(resp: Response) -> Result<impl Iterator<Item = (Arc<str>, String)>> {
     if resp.is_error() {
-        resp.single_frame()?;
+        resp.into_single_frame()?;
         unreachable!()
     }
 
@@ -249,7 +248,7 @@ fn flatten_response(resp: Response) -> Result<impl Iterator<Item = (Arc<str>, St
 
 async fn send_recv_simple(client: &mut Client, cmd: Command) -> Result<()> {
     client.send(cmd).await?;
-    client.receive().await?.ok_or(Error::UnexpectedNone)?.single_frame()?;
+    client.receive().await?.ok_or(Error::UnexpectedNone)?.into_single_frame()?;
     Ok(())
 }
 
