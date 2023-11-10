@@ -39,7 +39,6 @@ async fn main() -> Result<(), Error> {
         flag::register_conditional_default(*sig, CLOSED.clone()).unwrap();
         flag::register(*sig, CLOSED.clone()).unwrap();
     }
-    flag::register_conditional_default(SIGHUP, CLOSED.clone()).unwrap();
     flag::register(SIGHUP, CLOSED.clone()).unwrap();
     handle.add_signal(SIGHUP)?;
     handle.add_signal(SIGUSR1)?;

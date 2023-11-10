@@ -9,6 +9,7 @@ use crate::OPTIONS;
 pub static CONFIG: Lazy<Config> = Lazy::new(|| {
     awconf::load_config::<Config>("mpd-shuffler", OPTIONS.awconf.as_ref(), None::<&str>)
         .expect("Error loading config")
+        .0
 });
 
 #[derive(Debug, Deserialize)]
