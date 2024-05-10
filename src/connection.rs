@@ -92,15 +92,13 @@ pub async fn run(signals: &mut Signals) -> Result<()> {
                 match sig {
                     Some(SIGUSR1) => {
                         println!("Got SIGUSR1, cleaning database");
-                        // TODO -- into_values()
-                        let files: Vec<_> = shuffler.values().into_iter().cloned().collect();
-                        shuffler.close().unwrap();
+                        let files = shuffler.close_into_values().unwrap();
 
                         let options = Options::default().keep_unrecognized(false);
                         let mut temp_shuffler =
-                            Shuffler::new(&CONFIG.database, options, Some(files.clone())).unwrap();
+                            Shuffler::new(&CONFIG.database, options, Some(files)).unwrap();
                         temp_shuffler.compact().unwrap();
-                        temp_shuffler.close().unwrap();
+                        let files = temp_shuffler.close_into_values().unwrap();
 
                         let options = Options::default().keep_unrecognized(true);
                         shuffler = Shuffler::new(&CONFIG.database, options, Some(files)).unwrap();
