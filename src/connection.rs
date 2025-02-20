@@ -23,6 +23,7 @@ impl<M: AsyncRead + AsyncWrite + Unpin> MpdIo for M {}
 // We assume anything dealing with MPD is allowed to fail, but anything involving the shuffler must
 // succeed.
 #[derive(Debug)]
+#[allow(unused)]
 pub enum Error {
     IO(std::io::Error),
     Mpd(MpdProtocolError),
