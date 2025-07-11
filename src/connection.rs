@@ -2,16 +2,16 @@ use std::collections::{HashMap, HashSet};
 use std::num::ParseIntError;
 use std::sync::Arc;
 
+use aw_shuffle::AwShuffler;
 use aw_shuffle::persistent::rocksdb::Shuffler;
 use aw_shuffle::persistent::{Options, PersistentShuffler};
-use aw_shuffle::AwShuffler;
 use futures_util::StreamExt;
 use mpd_protocol::response::Response;
-use mpd_protocol::{response, AsyncConnection, Command, MpdProtocolError};
+use mpd_protocol::{AsyncConnection, Command, MpdProtocolError, response};
 use signal_hook::consts::SIGUSR1;
 use signal_hook_tokio::Signals;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::{lookup_host, TcpStream, UnixStream};
+use tokio::net::{TcpStream, UnixStream, lookup_host};
 use tokio::select;
 
 use crate::config::CONFIG;
@@ -257,7 +257,7 @@ async fn get_files(client: &mut Client) -> Result<impl Iterator<Item = String>> 
     let resp = client.receive().await?.ok_or(Error::UnexpectedNone)?;
     Ok(flatten_response(resp)?
         .filter(|(k, s)| {
-            &**k == "file" && CONFIG.song_regex.as_ref().map_or(true, |re| re.is_match(s))
+            &**k == "file" && CONFIG.song_regex.as_ref().is_none_or(|re| re.is_match(s))
         })
         .map(|(_, s)| s))
 }
