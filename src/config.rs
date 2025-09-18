@@ -1,12 +1,12 @@
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 
 use crate::OPTIONS;
 
-pub static CONFIG: Lazy<Config> = Lazy::new(|| {
+pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     awconf::load_config::<Config>("mpd-shuffler", OPTIONS.awconf.as_ref(), None::<&str>)
         .expect("Error loading config")
         .0

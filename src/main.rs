@@ -1,12 +1,11 @@
 use std::io::Error;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use clap::Parser;
 use futures_util::StreamExt;
-use once_cell::sync::Lazy;
 use signal_hook::consts::{SIGHUP, SIGUSR1, TERM_SIGNALS};
 use signal_hook::flag;
 use signal_hook_tokio::Signals;
@@ -27,8 +26,8 @@ pub struct Opt {
     awconf: Option<PathBuf>,
 }
 
-pub static OPTIONS: Lazy<Opt> = Lazy::new(Opt::parse);
-static CLOSED: Lazy<Arc<AtomicBool>> = Lazy::new(|| Arc::new(AtomicBool::new(false)));
+pub static OPTIONS: LazyLock<Opt> = LazyLock::new(Opt::parse);
+static CLOSED: LazyLock<Arc<AtomicBool>> = LazyLock::new(|| Arc::new(AtomicBool::new(false)));
 
 
 #[tokio::main(flavor = "current_thread")]
