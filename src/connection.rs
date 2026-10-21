@@ -143,13 +143,13 @@ impl PlayerState {
 
         let added = self.maybe_add_next(client, shuffler).await?;
 
-        if added || !self.next_song_id.is_empty() {
-            if let Some(keep) = CONFIG.keep_last {
-                let song_index: u32 = self.song.parse()?;
-                if song_index > keep {
-                    let del = "0:".to_owned() + &(song_index - keep).to_string();
-                    send_recv_simple(client, Command::new("delete").argument(del)).await?;
-                }
+        if (added || !self.next_song_id.is_empty())
+            && let Some(keep) = CONFIG.keep_last
+        {
+            let song_index: u32 = self.song.parse()?;
+            if song_index > keep {
+                let del = "0:".to_owned() + &(song_index - keep).to_string();
+                send_recv_simple(client, Command::new("delete").argument(del)).await?;
             }
         }
 
@@ -209,14 +209,14 @@ impl PlayerState {
             let random_song = shuffler.next().unwrap().unwrap();
             // It would be very, very unlikely for this to happen more than once.
             let id = self.playlist.get(random_song);
-            if let Some(id) = id {
-                if id == &self.song_id {
-                    if shuffler.size() == 1 {
-                        println!("No other songs are available to play");
-                        return Ok(false);
-                    }
-                    continue;
+            if let Some(id) = id
+                && id == &self.song_id
+            {
+                if shuffler.size() == 1 {
+                    println!("No other songs are available to play");
+                    return Ok(false);
                 }
+                continue;
             }
             break (random_song, id);
         };
